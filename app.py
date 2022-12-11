@@ -4,13 +4,27 @@ import pandas as pd
 import joblib
 from scipy.sparse import hstack
 import streamlit as st
+from streamlit_option_menu import option_menu
+
+
+# Constants
+MODEL_FILE_PATH = "ml\model\ml_model.joblib"
+TRANSFORM_FILE_PATH = "ml\data_transform"
+PRED_FILE_PATH = "data\predictions.csv"
+COLUMNS = ['id', 'amount_tsh', 'date_recorded', 'funder', 'gps_height',
+           'installer', 'longitude', 'latitude', 'wpt_name', 'num_private',
+           'basin', 'subvillage', 'region', 'region_code', 'district_code', 'lga',
+           'ward', 'population', 'public_meeting', 'recorded_by',
+           'scheme_management', 'scheme_name', 'permit', 'construction_year',
+           'extraction_type', 'extraction_type_group', 'extraction_type_class',
+           'management', 'management_group', 'payment', 'payment_type',
+           'water_quality', 'quality_group', 'quantity', 'quantity_group',
+           'source', 'source_type', 'source_class', 'waterpoint_type',
+           'waterpoint_type_group']
 
 
 # Load model
-MODEL_FILE_PATH = "ml\model\ml_model.joblib"
-
-
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_model(model_filepath):
     """Loads ml model in memory
 
@@ -24,10 +38,13 @@ def load_model(model_filepath):
     return model
 
 
+# Convert dataframe to csv
+@st.experimental_memo
+def convert_df(df):
+    return df.to_csv(index=False).encode('utf-8')
+
+
 # Prediction pipeline function
-TRANSFORM_FILE_PATH = "ml\data_transform"
-
-
 def predict(input_samples: any, return_id=False):
     """Receives raw input data and returns predictions given by ml model
 
@@ -39,16 +56,7 @@ def predict(input_samples: any, return_id=False):
         pd.DataFrame: Predictions dataframe
     """
     # Columns names in data
-    columns = ['id', 'amount_tsh', 'date_recorded', 'funder', 'gps_height',
-               'installer', 'longitude', 'latitude', 'wpt_name', 'num_private',
-               'basin', 'subvillage', 'region', 'region_code', 'district_code', 'lga',
-               'ward', 'population', 'public_meeting', 'recorded_by',
-               'scheme_management', 'scheme_name', 'permit', 'construction_year',
-               'extraction_type', 'extraction_type_group', 'extraction_type_class',
-               'management', 'management_group', 'payment', 'payment_type',
-               'water_quality', 'quality_group', 'quantity', 'quantity_group',
-               'source', 'source_type', 'source_class', 'waterpoint_type',
-               'waterpoint_type_group']
+    columns = COLUMNS
 
     # Create dataframe from input samples
     input_df = pd.DataFrame(input_samples, columns=columns)
@@ -257,7 +265,44 @@ def predict(input_samples: any, return_id=False):
 def main():
     """Application main function
     """
-    st.title("Pump Status Prediction")
+    st.title("Water Pumps Functionality Status Prediction App")
+    st.write("A Web Application to predict the functionality status of water pumps installed across Tanzania.")
+
+    with st.sidebar:
+
+        selection = option_menu("Prediction Options",
+                                ['Prediction for Single Pump',
+                                 'Prediction for Multiple Pumps'],
+                                icons=['check2', 'check2-all'],
+                                menu_icon="laptop", default_index=0)
+
+    if selection == 'Prediction for Single Pump':
+        st.header("Single Pump Prediction")
+        st.subheader("Input relevant data in the following fields:")
+
+        # Get inputs
+
+    elif selection == 'Prediction for Multiple Pumps':
+        st.header("Batch Prediction")
+        st.write(
+            "Upload data.csv file having batch of records and get predictions as predictions.csv")
+        input_file = st.file_uploader(label='Please upload data file in .csv format',
+                                      type='.csv', accept_multiple_files=False)
+        st.write("Sample Data Format:")
+        data = pd.read_csv("data\data_sample.csv")
+        data_sample = pd.DataFrame(data, columns=COLUMNS)
+        st.dataframe(data_sample)
+
+        # code for Prediction
+        # creating a button for Prediction
+        if st.button('Get Predictions'):
+            input_data = pd.read_csv(input_file, parse_dates=['date_recorded'])
+            predictions = predict(input_data, return_id=True)
+            csv = convert_df(predictions)
+            st.success(
+                'Success..! You can Download predictions.csv using button below.', icon="✅")
+            st.download_button("Download Predictions file", csv,
+                               "predictions.csv", "text/csv", key='download-csv')
 
 
 if __name__ == '__main__':
