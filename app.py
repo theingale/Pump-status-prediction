@@ -2,7 +2,6 @@ import os
 import numpy as np
 import pandas as pd
 import joblib
-import random
 from scipy.sparse import hstack
 import streamlit as st
 
@@ -26,7 +25,7 @@ def load_model(model_filepath):
 
 
 # Prediction pipeline function
-TRANSFORM_FILE_PATH = "ml\data_processing"
+TRANSFORM_FILE_PATH = "ml\data_transform"
 
 
 def predict(input_samples: any, return_id=False):
@@ -90,7 +89,7 @@ def predict(input_samples: any, return_id=False):
         """
         if x == 0:
             year_range = list(range(2000, 2013))
-            impute_year = random.choice(year_range)
+            impute_year = np.random.choice(year_range)
             return impute_year
 
     input_df['construction_year'] = np.where(input_df['construction_year'] == 0,
@@ -123,88 +122,107 @@ def predict(input_samples: any, return_id=False):
     # Data Preparation
 
     # gps_height
-    gps_height_normalizer = joblib.load("gps_height_normalizer")
+    gps_height_normalizer = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "gps_height_normalizer"))
     test_gps_height_normalized = gps_height_normalizer.transform(
         input_df['gps_height'].values.reshape(-1, 1))
     # longitude
-    longitude_normalizer = joblib.load("longitude_normalizer")
+    longitude_normalizer = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "longitude_normalizer"))
     test_longitude_normalized = longitude_normalizer.transform(
         input_df['longitude'].values.reshape(-1, 1))
     # latitude
-    latitude_normalizer = joblib.load("latitude_normalizer")
+    latitude_normalizer = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "latitude_normalizer"))
     test_latitude_normalized = latitude_normalizer.transform(
         input_df['latitude'].values.reshape(-1, 1))
     # population
-    population_normalizer = joblib.load("population_normalizer")
+    population_normalizer = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "population_normalizer"))
     test_population_normalized = population_normalizer.transform(
         input_df['population'].values.reshape(-1, 1))
     # waterpoint_age
-    waterpoint_age_normalizer = joblib.load("waterpoint_age_normalizer")
+    waterpoint_age_normalizer = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "waterpoint_age_normalizer"))
     test_waterpoint_age_normalized = waterpoint_age_normalizer.transform(
         input_df['waterpoint_age'].values.reshape(-1, 1))
     # basin
-    basin_encoder = joblib.load("basin_encoder")
+    basin_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "basin_encoder"))
     test_basin_encoded = basin_encoder.transform(
         input_df['basin'].values.reshape(-1, 1))
-    # region
-    region_encoder = joblib.load("region_encoder")
+    # Region
+    region_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "region_encoder"))
     test_region_encoded = region_encoder.transform(
         input_df['region'].values.reshape(-1, 1))
     # lga
-    lga_encoder = joblib.load("lga_encoder")
+    lga_encoder = joblib.load(os.path.join(TRANSFORM_FILE_PATH, "lga_encoder"))
     test_lga_encoded = lga_encoder.transform(
         input_df['lga'].values.reshape(-1, 1))
     # public_meeting
-    public_meeting_encoder = joblib.load("public_meeting_encoder")
+    public_meeting_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "public_meeting_encoder"))
     test_public_meeting_encoded = public_meeting_encoder.transform(
         input_df['public_meeting'].values.reshape(-1, 1))
     # scheme_management
-    scheme_management_encoder = joblib.load("scheme_management_encoder")
+    scheme_management_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "scheme_management_encoder"))
     test_scheme_management_encoded = scheme_management_encoder.transform(
         input_df['scheme_management'].values.reshape(-1, 1))
     # permit
-    permit_encoder = joblib.load("permit_encoder")
+    permit_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "permit_encoder"))
     test_permit_encoded = permit_encoder.transform(
         input_df['permit'].values.reshape(-1, 1))
     # extraction_type_class
-    extraction_type_class_encoder = joblib.load(
-        "extraction_type_class_encoder")
+    extraction_type_class_encoder = joblib.load(os.path.join(TRANSFORM_FILE_PATH,
+                                                             "extraction_type_class_encoder"))
     test_extraction_type_class_encoded = extraction_type_class_encoder.transform(
         input_df['extraction_type_class'].values.reshape(-1, 1))
     # management
-    management_encoder = joblib.load("management_encoder")
+    management_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "management_encoder"))
     test_management_encoded = management_encoder.transform(
         input_df['management'].values.reshape(-1, 1))
     # payment_type
-    payment_type_encoder = joblib.load("payment_type_encoder")
+    payment_type_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "payment_type_encoder"))
     test_payment_type_encoded = payment_type_encoder.transform(
         input_df['payment_type'].values.reshape(-1, 1))
     # water_quality
-    water_quality_encoder = joblib.load("water_quality_encoder")
+    water_quality_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "water_quality_encoder"))
     test_water_quality_encoded = water_quality_encoder.transform(
         input_df['water_quality'].values.reshape(-1, 1))
     # quantity
-    quantity_encoder = joblib.load("quantity_encoder")
+    quantity_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "quantity_encoder"))
     test_quantity_encoded = quantity_encoder.transform(
         input_df['quantity'].values.reshape(-1, 1))
     # source_type
-    source_type_encoder = joblib.load("source_type_encoder")
+    source_type_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "source_type_encoder"))
     test_source_type_encoded = source_type_encoder.transform(
         input_df['source_type'].values.reshape(-1, 1))
     # source_class
-    source_class_encoder = joblib.load("source_class_encoder")
+    source_class_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "source_class_encoder"))
     test_source_class_encoded = source_class_encoder.transform(
         input_df['source_class'].values.reshape(-1, 1))
     # waterpoint_type
-    waterpoint_type_encoder = joblib.load("waterpoint_type_encoder")
+    waterpoint_type_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "waterpoint_type_encoder"))
     test_waterpoint_type_encoded = waterpoint_type_encoder.transform(
         input_df['waterpoint_type'].values.reshape(-1, 1))
     # record_year
-    record_year_encoder = joblib.load("record_year_encoder")
+    record_year_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "record_year_encoder"))
     test_record_year_encoded = record_year_encoder.transform(
         input_df['record_year'].values.reshape(-1, 1))
     # record_month
-    record_month_encoder = joblib.load("record_month_encoder")
+    record_month_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "record_month_encoder"))
     test_record_month_encoded = record_month_encoder.transform(
         input_df['record_month'].values.reshape(-1, 1))
 
@@ -218,15 +236,29 @@ def predict(input_samples: any, return_id=False):
                             test_record_month_encoded, test_waterpoint_age_normalized]).tocsr()
 
     # Load model
-    model = joblib.load("rf_model")
+    model = load_model(MODEL_FILE_PATH)
 
     # predictions
     predictions = model.predict(input_encoded)
-    label_encoder = joblib.load("label_encoder")
+    label_encoder = joblib.load(os.path.join(
+        TRANSFORM_FILE_PATH, "label_encoder"))
     predictions = label_encoder.inverse_transform(predictions)
+
     if return_id:
         pred_dict = {"id": ids, "status_group": predictions}
     else:
         pred_dict = {"status_group": predictions}
+
     pred_df = pd.DataFrame(pred_dict)
     return pred_df
+
+
+# Application main function
+def main():
+    """Application main function
+    """
+    st.title("Pump Status Prediction")
+
+
+if __name__ == '__main__':
+    main()
