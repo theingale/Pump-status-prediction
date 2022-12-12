@@ -5,11 +5,9 @@ import pandas as pd
 from scipy.sparse import hstack
 import streamlit as st
 
-
-
 # path constant
-TRANSFORM_FILE_PATH = "ml\data_transform"
-MODEL_FILE_PATH = "ml\model\ml_model.joblib"
+TRANSFORM_FILE_PATH = "ml/data_transform"
+MODEL_FILE_PATH = "ml/model/ml_model.joblib"
 
 
 # Data Constants
