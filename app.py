@@ -210,7 +210,7 @@ def main():
 
         st.write("Your data file should be like sample data file.")
         st.write("Sample Data File:")
-        data = pd.read_csv("data\data_sample.csv")
+        data = pd.read_csv("data/data_sample.csv")
         data_sample = pd.DataFrame(data, columns=COLUMNS)
         st.dataframe(data_sample)
         input_file = st.file_uploader(label='Please upload data file in .csv format',
