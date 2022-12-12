@@ -1,16 +1,13 @@
 import os
 import numpy as np
 import pandas as pd
-import joblib
-from scipy.sparse import hstack
 import streamlit as st
 from streamlit_option_menu import option_menu
+from app_data import options
+from app_data.predictors import batch_predict
+from app_data.predictors import sample_predict
 
-
-# Constants
-MODEL_FILE_PATH = "ml\model\ml_model.joblib"
-TRANSFORM_FILE_PATH = "ml\data_transform"
-PRED_FILE_PATH = "data\predictions.csv"
+# Data Constants
 COLUMNS = ['id', 'amount_tsh', 'date_recorded', 'funder', 'gps_height',
            'installer', 'longitude', 'latitude', 'wpt_name', 'num_private',
            'basin', 'subvillage', 'region', 'region_code', 'district_code', 'lga',
@@ -22,243 +19,48 @@ COLUMNS = ['id', 'amount_tsh', 'date_recorded', 'funder', 'gps_height',
            'source', 'source_type', 'source_class', 'waterpoint_type',
            'waterpoint_type_group']
 
+# Medians and modes
+GPS_HEIGHT_MEDIAN = 369.0
+LATITUDE_MEDIAN = -5.0216
+LONGITUDE_MEDIAN = 34.9087
+CONSTRUCTION_YEAR_MEDIAN = 2010
+PUBLIC_MEETING_MODE = True
+SCHEME_MANAGEMENT_MODE = "VWC"
+PERMIT_MODE = True
+POPULATION_MEDIAN = 0
+BASIN_MODE = "Lake Victoria"
+LGA_MODE = "Njombe"
+REGION_MODE = "Iringa"
+EXTRACTION_TYPE_CLASS_MODE = "gravity"
+MANAGEMENT_MODE = "vwc"
+PAYMENT_TYPE_MODE = "never pay"
+WATER_QUALITY_MODE = "soft"
+QUANTITY_MODE = "enough"
+SOURCE_TYPE_MODE = "spring"
+SOURCE_CLASS_MODE = "groundwater"
+WATERPOINT_TYPE_MODE = "communal standpipe"
 
-# Load model
-@st.cache(allow_output_mutation=True)
-def load_model(model_filepath):
-    """Loads ml model in memory
-
-    Args:
-        model_filepath (str): File path of the ml model
-
-    Returns:
-        scikit-learn ml model object
-    """
-    model = joblib.load(MODEL_FILE_PATH)
-    return model
+# App constants
+BASIN_OPTIONS = options.BASIN_OPTIONS
+REGION_OPTIONS = options.REGION_OPTIONS
+LGA_OPTIONS = options.LGA_OPTIONS
+PUBLIC_MEETING_OPTIONS = options.PUBLIC_MEETING_OPTIONS
+PERMIT_OPTIONS = options.PERMIT_OPTIONS
+SCHEME_MANAGEMENT_OPTIONS = options.SCHEME_MANAGEMENT_OPTIONS
+EXTRACTION_TYPE_CLASS_OPTIONS = options.EXTRACTION_TYPE_CLASS_OPTIONS
+MANAGEMENT_OPTIONS = options.MANAGEMENT_OPTIONS
+PAYMENT_TYPE_OPTIONS = options.PAYMENT_TYPE_OPTIONS
+WATER_QUALITY_OPTIONS = options.WATER_QUALITY_OPTIONS
+QUANTITY_OPTIONS = options.QUANTITY_OPTIONS
+SOURCE_TYPE_OPTIONS = options.SOURCE_TYPE_OPTIONS
+SOURCE_CLASS_OPTIONS = options.SOURCE_CLASS_OPTIONS
+WATERPOINT_TYPE_OPTIONS = options.WATERPOINT_TYPE_OPTIONS
 
 
 # Convert dataframe to csv
-@st.experimental_memo
+# @st.experimental_memo
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
-
-
-# Prediction pipeline function
-def predict(input_samples: any, return_id=False):
-    """Receives raw input data and returns predictions given by ml model
-
-    Args:
-        input_samples (any): Raw input sample/s
-        return_id (bool, optional): True to return input sample row ids. Defaults to False.
-
-    Returns:
-        pd.DataFrame: Predictions dataframe
-    """
-    # Columns names in data
-    columns = COLUMNS
-
-    # Create dataframe from input samples
-    input_df = pd.DataFrame(input_samples, columns=columns)
-
-    # Imputing missing values
-    # gps_height
-    GPS_HEIGHT_MEDIAN = 369.0
-    input_df['gps_height'] = np.where(
-        input_df['gps_height'] <= 0, GPS_HEIGHT_MEDIAN, input_df['gps_height'])
-    # latitude
-    LATITUDE_MEDIAN = -5.0216
-    input_df['latitude'] = np.where(
-        input_df['latitude'] < -11.8, LATITUDE_MEDIAN, input_df['latitude'])
-    input_df['latitude'] = np.where(
-        input_df['latitude'] > -1, LATITUDE_MEDIAN, input_df['latitude'])
-    # longitude
-    LONGITUDE_MEDIAN = 34.9087
-    input_df['longitude'] = np.where(
-        input_df['longitude'] < 29, LONGITUDE_MEDIAN, input_df['longitude'])
-    input_df['longitude'] = np.where(
-        input_df['longitude'] > 40.8, LONGITUDE_MEDIAN, input_df['longitude'])
-    # public_meeting
-    PUBLIC_MEETING_MODE = True
-    input_df['public_meeting'] = input_df['public_meeting'].fillna(
-        PUBLIC_MEETING_MODE)
-    # scheme_management
-    SCHEME_MANAGEMENT_MODE = "VWC"
-    input_df['scheme_management'] = input_df['scheme_management'].fillna(
-        SCHEME_MANAGEMENT_MODE)
-    # permit
-    PERMIT_MODE = True
-    input_df['permit'] = input_df['permit'].fillna(PERMIT_MODE)
-    # construction_year
-
-    def year_imputer(x):
-        """
-        Function to impute construction_year in data
-        """
-        if x == 0:
-            year_range = list(range(2000, 2013))
-            impute_year = np.random.choice(year_range)
-            return impute_year
-
-    input_df['construction_year'] = np.where(input_df['construction_year'] == 0,
-                                             input_df['construction_year'].apply(
-                                                 year_imputer),
-                                             input_df['construction_year'])
-
-    # Feature Engineering
-    # Creating separate year and month columns
-    input_df['date_recorded'] = pd.to_datetime(input_df['date_recorded'])
-    input_df['record_year'] = input_df['date_recorded'].dt.year
-    input_df['record_month'] = input_df['date_recorded'].dt.month
-    input_df['waterpoint_age'] = input_df['record_year'] - \
-        input_df['construction_year']
-
-    # treating record_year and record_month as categorical features
-    input_df[['record_year', 'record_month']] = input_df[[
-        'record_year', 'record_month']].astype('object')
-
-    # Feature Selection
-    ids = input_df['id'].values
-    dropped_features = ['id', 'amount_tsh', 'funder', 'installer', 'wpt_name',
-                        'num_private', 'subvillage', 'region_code', 'district_code',
-                        'ward', 'recorded_by', 'scheme_name', 'construction_year',
-                        'extraction_type', 'extraction_type_group', 'management_group',
-                        'payment', 'quality_group', 'quantity_group', 'source',
-                        'waterpoint_type_group', 'date_recorded']
-    input_df = input_df.drop(dropped_features, axis=1)
-
-    # Data Preparation
-
-    # gps_height
-    gps_height_normalizer = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "gps_height_normalizer"))
-    test_gps_height_normalized = gps_height_normalizer.transform(
-        input_df['gps_height'].values.reshape(-1, 1))
-    # longitude
-    longitude_normalizer = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "longitude_normalizer"))
-    test_longitude_normalized = longitude_normalizer.transform(
-        input_df['longitude'].values.reshape(-1, 1))
-    # latitude
-    latitude_normalizer = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "latitude_normalizer"))
-    test_latitude_normalized = latitude_normalizer.transform(
-        input_df['latitude'].values.reshape(-1, 1))
-    # population
-    population_normalizer = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "population_normalizer"))
-    test_population_normalized = population_normalizer.transform(
-        input_df['population'].values.reshape(-1, 1))
-    # waterpoint_age
-    waterpoint_age_normalizer = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "waterpoint_age_normalizer"))
-    test_waterpoint_age_normalized = waterpoint_age_normalizer.transform(
-        input_df['waterpoint_age'].values.reshape(-1, 1))
-    # basin
-    basin_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "basin_encoder"))
-    test_basin_encoded = basin_encoder.transform(
-        input_df['basin'].values.reshape(-1, 1))
-    # Region
-    region_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "region_encoder"))
-    test_region_encoded = region_encoder.transform(
-        input_df['region'].values.reshape(-1, 1))
-    # lga
-    lga_encoder = joblib.load(os.path.join(TRANSFORM_FILE_PATH, "lga_encoder"))
-    test_lga_encoded = lga_encoder.transform(
-        input_df['lga'].values.reshape(-1, 1))
-    # public_meeting
-    public_meeting_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "public_meeting_encoder"))
-    test_public_meeting_encoded = public_meeting_encoder.transform(
-        input_df['public_meeting'].values.reshape(-1, 1))
-    # scheme_management
-    scheme_management_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "scheme_management_encoder"))
-    test_scheme_management_encoded = scheme_management_encoder.transform(
-        input_df['scheme_management'].values.reshape(-1, 1))
-    # permit
-    permit_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "permit_encoder"))
-    test_permit_encoded = permit_encoder.transform(
-        input_df['permit'].values.reshape(-1, 1))
-    # extraction_type_class
-    extraction_type_class_encoder = joblib.load(os.path.join(TRANSFORM_FILE_PATH,
-                                                             "extraction_type_class_encoder"))
-    test_extraction_type_class_encoded = extraction_type_class_encoder.transform(
-        input_df['extraction_type_class'].values.reshape(-1, 1))
-    # management
-    management_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "management_encoder"))
-    test_management_encoded = management_encoder.transform(
-        input_df['management'].values.reshape(-1, 1))
-    # payment_type
-    payment_type_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "payment_type_encoder"))
-    test_payment_type_encoded = payment_type_encoder.transform(
-        input_df['payment_type'].values.reshape(-1, 1))
-    # water_quality
-    water_quality_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "water_quality_encoder"))
-    test_water_quality_encoded = water_quality_encoder.transform(
-        input_df['water_quality'].values.reshape(-1, 1))
-    # quantity
-    quantity_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "quantity_encoder"))
-    test_quantity_encoded = quantity_encoder.transform(
-        input_df['quantity'].values.reshape(-1, 1))
-    # source_type
-    source_type_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "source_type_encoder"))
-    test_source_type_encoded = source_type_encoder.transform(
-        input_df['source_type'].values.reshape(-1, 1))
-    # source_class
-    source_class_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "source_class_encoder"))
-    test_source_class_encoded = source_class_encoder.transform(
-        input_df['source_class'].values.reshape(-1, 1))
-    # waterpoint_type
-    waterpoint_type_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "waterpoint_type_encoder"))
-    test_waterpoint_type_encoded = waterpoint_type_encoder.transform(
-        input_df['waterpoint_type'].values.reshape(-1, 1))
-    # record_year
-    record_year_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "record_year_encoder"))
-    test_record_year_encoded = record_year_encoder.transform(
-        input_df['record_year'].values.reshape(-1, 1))
-    # record_month
-    record_month_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "record_month_encoder"))
-    test_record_month_encoded = record_month_encoder.transform(
-        input_df['record_month'].values.reshape(-1, 1))
-
-    # Creating data matrix
-    input_encoded = hstack([test_gps_height_normalized, test_longitude_normalized, test_latitude_normalized,
-                            test_basin_encoded, test_region_encoded, test_lga_encoded, test_population_normalized,
-                            test_public_meeting_encoded, test_scheme_management_encoded, test_permit_encoded,
-                            test_extraction_type_class_encoded, test_management_encoded, test_payment_type_encoded,
-                            test_water_quality_encoded, test_quantity_encoded, test_source_type_encoded,
-                            test_source_class_encoded, test_waterpoint_type_encoded, test_record_year_encoded,
-                            test_record_month_encoded, test_waterpoint_age_normalized]).tocsr()
-
-    # Load model
-    model = load_model(MODEL_FILE_PATH)
-
-    # predictions
-    predictions = model.predict(input_encoded)
-    label_encoder = joblib.load(os.path.join(
-        TRANSFORM_FILE_PATH, "label_encoder"))
-    predictions = label_encoder.inverse_transform(predictions)
-
-    if return_id:
-        pred_dict = {"id": ids, "status_group": predictions}
-    else:
-        pred_dict = {"status_group": predictions}
-
-    pred_df = pd.DataFrame(pred_dict)
-    return pred_df
 
 
 # Application main function
@@ -279,25 +81,147 @@ def main():
     if selection == 'Prediction for Single Pump':
         st.header("Single Pump Prediction")
         st.subheader("Input relevant data in the following fields:")
+        predict_button_status = True
 
-        # Get inputs
+        with st.form("Input values"):
+
+            # Columns in app
+            col1, col2 = st.columns(2)
+
+            with col1:
+                input_gps_height = float(st.number_input(
+                    "GPS Height", min_value=0.0, value=GPS_HEIGHT_MEDIAN))
+
+                input_population = st.number_input(
+                    "Population", min_value=0, value=POPULATION_MEDIAN)
+
+                input_construction_year = int(st.number_input(
+                    "Construction year", min_value=1960, max_value=2013, value=CONSTRUCTION_YEAR_MEDIAN, step=1))
+
+                input_basin = st.selectbox("Basin", options=BASIN_OPTIONS)
+                if input_basin == None:
+                    input_basin = BASIN_MODE
+
+                input_lga = st.selectbox("lga", options=LGA_OPTIONS)
+                if input_lga == None:
+                    input_lga = LGA_MODE
+
+                input_scheme_management = st.selectbox(
+                    "Scheme Managemnt", options=SCHEME_MANAGEMENT_OPTIONS)
+                if input_scheme_management == None:
+                    input_scheme_management = SCHEME_MANAGEMENT_MODE
+
+                input_managemnt = st.selectbox(
+                    "Management", options=MANAGEMENT_OPTIONS)
+                if input_managemnt == None:
+                    input_managemnt = MANAGEMENT_MODE
+
+                input_water_quality = st.selectbox(
+                    "Water Quality", options=WATER_QUALITY_OPTIONS)
+                if input_water_quality == None:
+                    input_water_quality = WATER_QUALITY_MODE
+
+                input_source_type = st.selectbox(
+                    "Source Type", options=SOURCE_TYPE_OPTIONS)
+                if input_source_type == None:
+                    input_source_type = SOURCE_TYPE_MODE
+
+                input_waterpoint_type = st.selectbox(
+                    "Waterpoint Type", options=WATERPOINT_TYPE_OPTIONS)
+                if input_waterpoint_type == None:
+                    input_waterpoint_type = WATERPOINT_TYPE_MODE
+
+            with col2:
+                input_longitude = st.number_input(
+                    "Longitude", min_value=28.0, max_value=41.0, value=LONGITUDE_MEDIAN)
+
+                input_latitude = st.number_input(
+                    "Latitude", min_value=-13.0, max_value=0.0, value=LATITUDE_MEDIAN)
+
+                input_region = st.selectbox("Region", options=REGION_OPTIONS)
+                if input_region == None:
+                    input_region = REGION_MODE
+
+                input_public_meeting = st.selectbox("Public Meeting",
+                                                    options=PUBLIC_MEETING_OPTIONS)
+                if input_public_meeting == None:
+                    input_public_meeting = PUBLIC_MEETING_MODE
+
+                input_permit = st.selectbox("Permit",
+                                            options=PERMIT_OPTIONS)
+                if input_permit == None:
+                    input_permit = PERMIT_MODE
+
+                input_extraction_type_class = st.selectbox(
+                    "Extraction Type Class", options=EXTRACTION_TYPE_CLASS_OPTIONS)
+                if input_extraction_type_class == None:
+                    input_extraction_type_class = EXTRACTION_TYPE_CLASS_MODE
+
+                input_payment_type = st.selectbox(
+                    "Payment Type", options=PAYMENT_TYPE_OPTIONS)
+                if input_payment_type == None:
+                    input_payment_type = PAYMENT_TYPE_MODE
+
+                input_quantity = st.selectbox(
+                    "Quantity", options=QUANTITY_OPTIONS)
+                if input_quantity == None:
+                    input_quantity = QUANTITY_MODE
+
+                input_source_class = st.selectbox(
+                    "Source Class", options=SOURCE_CLASS_OPTIONS)
+                if input_source_class == None:
+                    input_source_class = SOURCE_CLASS_MODE
+
+                input_date_recorded = st.text_input(
+                    "Date Recorded (DD-MM-YYYY)", value="DD-MM-YYYY")
+
+            # Every form must have a submit button.
+            if st.form_submit_button("Submit"):
+                if input_date_recorded == "DD-MM-YYYY":
+                    st.error("Please enter date in required format")
+                else:
+                    st.success("Received data succesfully.",  icon="✅")
+                    st.success(
+                        "Press button below to get pump status.",  icon="✅")
+                    predict_button_status = False
+
+        # Create input sample
+        input_sample = np.array([0, 0, input_date_recorded, "funder", input_gps_height,
+                                 "installer", input_longitude, input_latitude,
+                                 "wpt_name", 0, input_basin, "subvillage", input_region,
+                                 "rcode", "dcode", input_lga, "ward", input_population,
+                                 input_public_meeting, "recorder", input_scheme_management,
+                                 "scheme_name", input_permit, input_construction_year,
+                                 "ext_type", "ext_grp", input_extraction_type_class,
+                                 input_managemnt, "mng_grp", "payment", input_payment_type,
+                                 input_water_quality, "quality_grp", input_quantity,
+                                 "qty_grp", "src", input_source_type, input_source_class,
+                                 input_waterpoint_type, "wpt_tp_grp"]).reshape(1, -1)
+
+        if st.button('Predict Pump Status', disabled=predict_button_status):
+            prediction = sample_predict(input_sample, return_id=False)
+            pred = str(prediction['status_group'].values[0])
+            st.info(f'Pump status: {pred}', icon="✔")
 
     elif selection == 'Prediction for Multiple Pumps':
         st.header("Batch Prediction")
         st.write(
             "Upload data.csv file having batch of records and get predictions as predictions.csv")
-        input_file = st.file_uploader(label='Please upload data file in .csv format',
-                                      type='.csv', accept_multiple_files=False)
-        st.write("Sample Data Format:")
+
+        st.write("Your data file should be like sample data file.")
+        st.write("Sample Data File:")
         data = pd.read_csv("data\data_sample.csv")
         data_sample = pd.DataFrame(data, columns=COLUMNS)
         st.dataframe(data_sample)
+        input_file = st.file_uploader(label='Please upload data file in .csv format',
+                                      type='.csv', accept_multiple_files=False)
 
         # code for Prediction
         # creating a button for Prediction
         if st.button('Get Predictions'):
-            input_data = pd.read_csv(input_file, parse_dates=['date_recorded'])
-            predictions = predict(input_data, return_id=True)
+            input_data = pd.read_csv(input_file, parse_dates=[
+                                     'date_recorded'], dayfirst=True)
+            predictions = batch_predict(input_data, return_id=True)
             csv = convert_df(predictions)
             st.success(
                 'Success..! You can Download predictions.csv using button below.', icon="✅")

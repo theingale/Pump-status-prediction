@@ -2,5 +2,6 @@
     "python.analysis.extraPaths": [
         "./venv/Lib/site-packages"
     ],
-    "python.analysis.typeCheckingMode": "off"
+    "python.analysis.typeCheckingMode": "off",
+    "editor.fontSize": 14
 }
